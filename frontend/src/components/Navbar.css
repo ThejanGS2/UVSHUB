@@ -1,0 +1,73 @@
+/* ── Navbar layout ──────────────────────────────────────────────────────── */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 48px 20px;
+  background: #ffffff;
+  position: relative;
+  z-index: 100;
+}
+
+/* ── Pill container ─────────────────────────────────────────────────────── */
+.navbar__pill {
+  display: flex;
+  align-items: center;
+  background: #f0f0f0;          /* the light grey pill background */
+  border-radius: 999px;
+  padding: 6px 8px;
+  gap: 2px;
+}
+
+/* ── Nav links ──────────────────────────────────────────────────────────── */
+.navbar__link {
+  display: block;
+  padding: 10px 22px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #888888;
+  text-decoration: none;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: color 0.18s ease, background 0.18s ease, font-weight 0.1s ease;
+  letter-spacing: -0.01em;
+}
+
+.navbar__link:hover {
+  color: #111111;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Active / selected link */
+.navbar__link--active {
+  color: #111111;
+  font-weight: 700;
+}
+
+/* ── Enroll Now button ──────────────────────────────────────────────────── */
+.navbar__cta {
+  padding: 14px 30px;
+  background: #111111;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  border-radius: 18px;          /* rounded rect — not full pill — matches recording */
+  cursor: pointer;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  transition: background 0.18s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.navbar__cta:hover {
+  background: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.navbar__cta:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
