@@ -15,20 +15,28 @@
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   background: #ffffff;
-  border-radius: 999px;
-  padding: 7px 14px 7px 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.09);
+  border-radius: 12px;
+  padding: 9px 13px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06), 0 3px 12px rgba(0, 0, 0, 0.04);
   white-space: nowrap;
+  --badge-rotation: -10deg;
+  transform: rotate(var(--badge-rotation));
   animation: floatBadge 3.5s ease-in-out infinite;
   z-index: 20;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.stat-badge--top-left  { top: 155px; left: 13%;  animation-delay: 0s;   }
-.stat-badge--top-right { top: 130px; right: 11%; animation-delay: 0.6s; }
-.stat-badge--mid-left  { top: 265px; left: 10%;  animation-delay: 1.2s; }
-.stat-badge--mid-right { top: 270px; right: 9%;  animation-delay: 1.8s; }
+.stat-badge:hover {
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.09), 0 4px 15px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.stat-badge--top-left  { top: 150px; left: 15%;  animation-delay: 0s; --badge-rotation: -20deg;  }
+.stat-badge--top-right { top: 180px; right: 18%; animation-delay: 0.6s; --badge-rotation: 20deg; }
+.stat-badge--mid-left  { top: 350px; left: 15%;  animation-delay: 1.2s; --badge-rotation: 15deg; }
+.stat-badge--mid-right { top: 350px; right: 18%;  animation-delay: 1.8s; --badge-rotation: -20deg; }
 
 .stat-badge__icon {
   display: flex;
@@ -38,15 +46,19 @@
 }
 
 .stat-badge__value {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #555555;
+  color: #374151;
   letter-spacing: -0.2px;
 }
 
 @keyframes floatBadge {
-  0%, 100% { transform: translateY(0px);  }
-  50%       { transform: translateY(-7px); }
+  0%, 100% {
+    transform: translateY(0) rotate(var(--badge-rotation));
+  }
+  50% {
+    transform: translateY(-8px) rotate(var(--badge-rotation));
+  }
 }
 
 
@@ -54,18 +66,22 @@
 .hero__content {
   position: relative;
   z-index: 10;
-  max-width: 740px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
 .hero__heading {
   font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
-  font-size: clamp(44px, 6vw, 72px);
-  font-weight: 700;
+  font-size: clamp(60px, 10vw, 100px);
+  font-weight: 1000;
   line-height: 1.1;
   letter-spacing: -1px;
   color: #0a0a0a;
   margin-bottom: 20px;
+}
+
+.hero__heading-nowrap {
+  white-space: nowrap;
 }
 
 .hero__subtext {
@@ -158,4 +174,10 @@
   object-position: top center;
   display: block;
   pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .stat-badge {
+    display: none;
+  }
 }
