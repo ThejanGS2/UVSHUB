@@ -1,5 +1,6 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const supabase = require('../config/supabaseClient');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const protect = async (req, res, next) => {
   let token;
@@ -17,20 +18,35 @@ const protect = async (req, res, next) => {
     return next(error);
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  req.user = await User.findById(decoded.id).select('-password');
+  // Verify the JWT via Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.getUser(token);
 
-  if (!req.user) {
-    const error = new Error('User no longer exists');
+  if (authError || !authData.user) {
+    const error = new Error('Invalid or expired token');
     error.statusCode = 401;
     return next(error);
   }
 
+  // Fetch the full student profile from Prisma
+  const student = await prisma.student.findUnique({
+    where: { id: authData.user.id },
+  });
+
+  if (!student) {
+    const error = new Error('User no longer exists in database');
+    error.statusCode = 401;
+    return next(error);
+  }
+
+  req.user = student;
   next();
 };
 
 const authorise = (...roles) =>
   (req, res, next) => {
+    // Currently, Prisma schema does not define a 'role' field for Students.
+    // If you add one in the future, you can uncomment this check:
+    /*
     if (!roles.includes(req.user.role)) {
       const error = new Error(
         `Role '${req.user.role}' is not authorised to access this route`
@@ -38,6 +54,7 @@ const authorise = (...roles) =>
       error.statusCode = 403;
       return next(error);
     }
+    */
     next();
   };
 

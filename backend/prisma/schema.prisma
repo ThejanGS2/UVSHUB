@@ -23,18 +23,19 @@ model Payments {
   Method     String
 }
 
-model Studnets {
+model Student {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   created_at      DateTime @default(now()) @db.Timestamptz
-  Student_ID      BigInt
+  Student_ID      BigInt   @default(autoincrement())
   Name            String
   Email           String
-  Password        String
   Watsapp_Number  String
   NIC             Decimal?
   Gurdian_s_Name  String   @map("Gurdian's_Name")
   Gurdians_Number String
   Address         String
+
+  @@map("Studnets")
 }
 
 model Subjects {
