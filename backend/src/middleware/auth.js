@@ -43,7 +43,7 @@ const protect = async (req, res, next) => {
 
 const authorise = (...roles) =>
   (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.Role)) {
+    if (!req.user || !roles.map(r => r.toLowerCase()).includes(req.user.Role.toLowerCase())) {
       const error = new Error(
         `Role '${req.user?.Role}' is not authorised to access this route`
       );
