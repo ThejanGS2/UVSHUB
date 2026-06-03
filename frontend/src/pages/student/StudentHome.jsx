@@ -3,26 +3,30 @@ import { useNavigate } from 'react-router-dom';
 import './StudentHome.css';
 
 const StudentHome = () => {
-  const [student, setStudent] = useState(null);
+  const [student] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) return null;
+    try {
+      return JSON.parse(storedUser);
+    } catch {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      return null;
+    }
+  });
+  
   const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-
-    if (!token || !storedUser) {
+    if (!token || !student) {
       navigate('/student/login');
       return;
     }
-
-    try {
-      setStudent(JSON.parse(storedUser));
-    } catch (e) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/student/login');
+    if (student.Role.toLowerCase() === 'admin') {
+      navigate('/admin/dashboard');
     }
-  }, [navigate]);
+  }, [student, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');

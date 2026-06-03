@@ -32,7 +32,11 @@ const StudentLogin = () => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      navigate('/student/home');
+      if (data.user && data.user.Role.toLowerCase() === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/student/home');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
