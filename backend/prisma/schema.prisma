@@ -9,9 +9,9 @@ datasource db {
 model Enrollments {
   id           BigInt   @id @default(autoincrement())
   created_at   DateTime @default(now()) @db.Timestamptz
-  Student_ID   BigInt?
-  Studnet_Name String?
-  Subject_Name String?
+  Student_ID   BigInt?  @unique
+  Studnet_Name String?  @unique
+  Subject_Name String?  @unique
 }
 
 model Payments {
@@ -26,21 +26,22 @@ model Payments {
 model Student {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   created_at      DateTime @default(now()) @db.Timestamptz
-  Student_ID      BigInt   @default(autoincrement())
-  Name            String
+  Student_ID      BigInt   @unique @default(autoincrement())
+  Name            String   @unique
   Email           String
   Watsapp_Number  String
   NIC             Decimal?
   Gurdian_s_Name  String   @map("Gurdian's_Name")
   Gurdians_Number String
   Address         String
+  Role            String   @default("student")
 
   @@map("Studnets")
 }
 
 model Subjects {
   id         BigInt  @id @default(autoincrement())
-  Name       String
+  Name       String  @unique
   Grade      Decimal
   Price      Decimal
   Instructor String
