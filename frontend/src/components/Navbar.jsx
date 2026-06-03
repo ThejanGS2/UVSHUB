@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import './Navbar.css';
 
 const NAV_LINKS = [
@@ -33,9 +34,9 @@ function Navbar() {
       </div>
 
       {/* ── Enroll Now CTA ── */}
-      <button id="navbar-enroll-btn" className="navbar__cta">
+      <Link to="/student/register" id="navbar-enroll-btn" className="navbar__cta" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
         Enroll Now
-      </button>
+      </Link>
 
     </nav>
   );

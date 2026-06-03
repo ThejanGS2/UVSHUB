@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import './Hero.css';
 import portrait1 from '../assets/portrait1.png';
 import portrait2 from '../assets/portrait2.png';
@@ -84,7 +85,7 @@ function Hero() {
         </p>
 
         <div className="hero__actions">
-          <button id="hero-enroll-btn" className="hero__btn hero__btn--dark">Get Started</button>
+          <Link to="/student/register" id="hero-enroll-btn" className="hero__btn hero__btn--dark">Get Started</Link>
           <button id="hero-details-btn" className="hero__btn hero__btn--light">Browse Courses</button>
         </div>
       </div>
