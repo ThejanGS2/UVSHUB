@@ -6,7 +6,9 @@ const { prisma } = require('../config/db');
  * @access  Private (Admin)
  */
 const getPayments = async (req, res) => {
-  const payments = await prisma.payments.findMany();
+  const payments = await prisma.payments.findMany({
+    orderBy: { created_at: 'desc' }
+  });
   
   // Convert BigInt for JSON serialization
   const serializedPayments = payments.map(p => ({
@@ -61,7 +63,10 @@ const approvePayment = async (req, res) => {
   });
 
   if (existingEnrollment) {
-    await prisma.payments.delete({ where: { id: paymentId } });
+    await prisma.payments.update({
+      where: { id: paymentId },
+      data: { Status: 'Approved' }
+    });
     return res.status(200).json({
       success: true,
       message: 'Payment approved, but student was already enrolled.'
@@ -77,9 +82,10 @@ const approvePayment = async (req, res) => {
     }
   });
 
-  // Delete the pending payment
-  await prisma.payments.delete({
+  // Mark the payment as approved so it remains in history
+  await prisma.payments.update({
     where: { id: paymentId }
+    ,data: { Status: 'Approved' }
   });
 
   res.status(200).json({
@@ -94,4 +100,49 @@ const approvePayment = async (req, res) => {
   });
 };
 
-module.exports = { getPayments, approvePayment };
+/**
+ * @desc    Create a new payment record
+ * @route   POST /api/v1/payments
+ * @access  Private
+ */
+const createPayment = async (req, res) => {
+  const { subjectName, amount, method } = req.body;
+
+  if (!subjectName || !amount || !method) {
+    const error = new Error('Subject, amount and method are required');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const student = req.user;
+  if (!student) {
+    const error = new Error('Not authorised');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const payment = await prisma.payments.create({
+    data: {
+      Subject: subjectName,
+      Student_ID: student.Student_ID,
+      Amount: String(parseFloat(amount)),
+      Method: method,
+      Status: 'Pending'
+    }
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Payment submitted successfully',
+    data: {
+      id: payment.id.toString(),
+      Subject: payment.Subject,
+      Student_ID: payment.Student_ID.toString(),
+      Amount: payment.Amount.toString(),
+      Method: payment.Method,
+      Status: payment.Status
+    }
+  });
+};
+
+module.exports = { getPayments, approvePayment, createPayment };

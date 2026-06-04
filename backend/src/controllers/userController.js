@@ -1,4 +1,5 @@
 const { prisma } = require('../config/db');
+const supabaseAdmin = require('../config/supabaseAdminClient');
 
 /**
  * @desc    Get all users
@@ -39,16 +40,53 @@ const getUser = async (req, res) => {
     where: { Student_ID: user.Student_ID }
   });
 
+  // Fetch corresponding Subject details to enrich the enrollment objects
+  const subjectNames = enrolledCourses.map(e => e.Subject_Name).filter(Boolean);
+  let subjects = [];
+  if (subjectNames.length > 0) {
+    subjects = await prisma.subjects.findMany({
+      where: { Name: { in: subjectNames } }
+    });
+  }
+
+  // Manually fetch instructors to get the proper InstructorName if the Instructor is a student ID
+  const instructorIds = subjects.map(s => s.Instructor).filter(Boolean);
+  const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  const validInstructorIds = instructorIds.filter(isUUID);
+  let instructors = [];
+  if (validInstructorIds.length > 0) {
+    instructors = await prisma.student.findMany({
+      where: { id: { in: validInstructorIds } },
+      select: { id: true, Name: true }
+    });
+  }
+
+  const enrichedEnrollments = enrolledCourses.map(enrollment => {
+    const subjectInfo = subjects.find(s => s.Name === enrollment.Subject_Name);
+    let instructorName = 'Unknown';
+    if (subjectInfo) {
+      const instInfo = instructors.find(i => i.id === subjectInfo.Instructor);
+      instructorName = instInfo?.Name || subjectInfo.Instructor || 'Unknown';
+    }
+
+    return {
+      ...enrollment,
+      id: enrollment.id.toString(),
+      Student_ID: enrollment.Student_ID ? enrollment.Student_ID.toString() : null,
+      Grade: subjectInfo ? parseFloat(subjectInfo.Grade) : null,
+      Medium: subjectInfo ? subjectInfo.Medium : 'Unknown',
+      Price: subjectInfo ? parseFloat(subjectInfo.Price) : null,
+      InstructorName: instructorName,
+      Instructor: subjectInfo ? subjectInfo.Instructor : null
+    };
+  });
+
   // Convert BigInt for JSON
   const serializedUser = {
     ...user,
     Student_ID: user.Student_ID.toString(),
     NIC: user.NIC ? user.NIC.toString() : null,
-    enrolledCourses: enrolledCourses.map(course => ({
-      ...course,
-      id: course.id.toString(),
-      Student_ID: course.Student_ID ? course.Student_ID.toString() : null
-    }))
+    enrolledCourses: enrichedEnrollments
   };
 
   res.status(200).json({ success: true, data: serializedUser });
@@ -67,10 +105,34 @@ const updateProfile = async (req, res) => {
   if (req.body.guardianName) fieldsToUpdate.Gurdian_s_Name = req.body.guardianName;
   if (req.body.guardianNumber) fieldsToUpdate.Gurdians_Number = req.body.guardianNumber;
 
-  const user = await prisma.student.update({
-    where: { id: req.user.id },
-    data: fieldsToUpdate,
-  });
+  let updatedPassword = false;
+
+  if (req.body.password) {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const error = new Error('Password updates are not configured on this server');
+      error.statusCode = 500;
+      throw error;
+    }
+
+    const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, {
+      password: req.body.password,
+    });
+
+    if (passwordError) {
+      const error = new Error(passwordError.message);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    updatedPassword = true;
+  }
+
+  const user = Object.keys(fieldsToUpdate).length > 0
+    ? await prisma.student.update({
+        where: { id: req.user.id },
+        data: fieldsToUpdate,
+      })
+    : req.user;
 
   // Convert BigInt for JSON
   const serializedUser = {
@@ -79,7 +141,11 @@ const updateProfile = async (req, res) => {
     NIC: user.NIC ? user.NIC.toString() : null,
   };
 
-  res.status(200).json({ success: true, data: serializedUser });
+  res.status(200).json({
+    success: true,
+    data: serializedUser,
+    message: updatedPassword ? 'Profile and password updated successfully' : 'Profile updated successfully',
+  });
 };
 
 /**

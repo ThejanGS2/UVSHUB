@@ -1,14 +1,17 @@
 const express = require('express');
-const { getPayments, approvePayment } = require('../controllers/paymentController');
+const { getPayments, approvePayment, createPayment } = require('../controllers/paymentController');
 const { protect, authorise } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Only admin users can manage payments
+// All payment routes require authentication
 router.use(protect);
-router.use(authorise('admin'));
 
-router.get('/', getPayments);
-router.post('/:id/approve', approvePayment);
+// Student submit payment
+router.post('/', createPayment);
+
+// Admin-only actions
+router.get('/', authorise('admin'), getPayments);
+router.post('/:id/approve', authorise('admin'), approvePayment);
 
 module.exports = router;
