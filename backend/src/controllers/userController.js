@@ -1,5 +1,6 @@
 const { prisma } = require('../config/db');
 const supabaseAdmin = require('../config/supabaseAdminClient');
+const { getSignedUrlIfNeeded } = require('../config/storageHelper');
 
 /**
  * @desc    Get all users
@@ -77,16 +78,34 @@ const getUser = async (req, res) => {
       Medium: subjectInfo ? subjectInfo.Medium : 'Unknown',
       Price: subjectInfo ? parseFloat(subjectInfo.Price) : null,
       InstructorName: instructorName,
-      Instructor: subjectInfo ? subjectInfo.Instructor : null
+      Instructor: subjectInfo ? subjectInfo.Instructor : null,
+      MeetingLink: subjectInfo ? subjectInfo.MeetingLink : ''
     };
   });
+
+  // Fetch payments for this student
+  const payments = await prisma.payments.findMany({
+    where: { Student_ID: user.Student_ID }
+  });
+
+  const serializedPayments = await Promise.all(payments.map(async p => ({
+    id: p.id.toString(),
+    created_at: p.created_at,
+    Subject: p.Subject,
+    Student_ID: p.Student_ID.toString(),
+    Amount: p.Amount.toString(),
+    Method: p.Method,
+    Status: p.Status,
+    Slip_Url: p.Slip_Url ? await getSignedUrlIfNeeded(p.Slip_Url) : null
+  })));
 
   // Convert BigInt for JSON
   const serializedUser = {
     ...user,
     Student_ID: user.Student_ID.toString(),
     NIC: user.NIC ? user.NIC.toString() : null,
-    enrolledCourses: enrichedEnrollments
+    enrolledCourses: enrichedEnrollments,
+    payments: serializedPayments
   };
 
   res.status(200).json({ success: true, data: serializedUser });

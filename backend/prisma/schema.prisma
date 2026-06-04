@@ -24,6 +24,7 @@ model Payments {
   Amount     Decimal
   Method     String
   Status     paymentStatus? @default(Pending)
+  Slip_Url   String?
 }
 
 model Student {

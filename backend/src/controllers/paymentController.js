@@ -1,4 +1,6 @@
 const { prisma } = require('../config/db');
+const supabaseAdmin = require('../config/supabaseAdminClient');
+const { getSignedUrlIfNeeded } = require('../config/storageHelper');
 
 /**
  * @desc    Get all payments
@@ -10,13 +12,14 @@ const getPayments = async (req, res) => {
     orderBy: { created_at: 'desc' }
   });
   
-  // Convert BigInt for JSON serialization
-  const serializedPayments = payments.map(p => ({
+  // Convert BigInt for JSON serialization & sign storage URLs on-the-fly
+  const serializedPayments = await Promise.all(payments.map(async p => ({
     ...p,
     id: p.id.toString(),
     Student_ID: p.Student_ID.toString(),
     Amount: p.Amount.toString(),
-  }));
+    Slip_Url: p.Slip_Url ? await getSignedUrlIfNeeded(p.Slip_Url) : null
+  })));
 
   res.status(200).json({ success: true, count: payments.length, data: serializedPayments });
 };
@@ -59,7 +62,10 @@ const approvePayment = async (req, res) => {
 
   // Check if enrollment already exists
   const existingEnrollment = await prisma.enrollments.findFirst({
-    where: { Student_ID: payment.Student_ID }
+    where: {
+      Student_ID: payment.Student_ID,
+      Subject_Name: payment.Subject
+    }
   });
 
   if (existingEnrollment) {
@@ -84,8 +90,8 @@ const approvePayment = async (req, res) => {
 
   // Mark the payment as approved so it remains in history
   await prisma.payments.update({
-    where: { id: paymentId }
-    ,data: { Status: 'Approved' }
+    where: { id: paymentId },
+    data: { Status: 'Approved' }
   });
 
   res.status(200).json({
@@ -97,6 +103,43 @@ const approvePayment = async (req, res) => {
       Studnet_Name: enrollment.Studnet_Name,
       Subject_Name: enrollment.Subject_Name
     }
+  });
+};
+
+/**
+ * @desc    Reject a payment
+ * @route   POST /api/v1/payments/:id/reject
+ * @access  Private (Admin)
+ */
+const rejectPayment = async (req, res) => {
+  let paymentId;
+  try {
+    paymentId = BigInt(req.params.id);
+  } catch (err) {
+    const error = new Error('Invalid Payment ID format');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const payment = await prisma.payments.findUnique({
+    where: { id: paymentId }
+  });
+
+  if (!payment) {
+    const error = new Error('Payment not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Mark the payment as rejected
+  await prisma.payments.update({
+    where: { id: paymentId },
+    data: { Status: 'Rejected' }
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Payment rejected successfully'
   });
 };
 
@@ -114,6 +157,12 @@ const createPayment = async (req, res) => {
     throw error;
   }
 
+  if (!req.file) {
+    const error = new Error('Payment slip file is required');
+    error.statusCode = 400;
+    throw error;
+  }
+
   const student = req.user;
   if (!student) {
     const error = new Error('Not authorised');
@@ -121,13 +170,42 @@ const createPayment = async (req, res) => {
     throw error;
   }
 
+  // Upload slip to Supabase Storage in 'Deposit Proof' bucket
+  const fileExt = req.file.originalname.split('.').pop() || 'png';
+  const cleanSubject = subjectName.replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `receipts/${student.Student_ID}_${cleanSubject}_${Date.now()}.${fileExt}`;
+
+  const { data: uploadData, error: uploadError } = await supabaseAdmin
+    .storage
+    .from('Deposit Proof')
+    .upload(filename, req.file.buffer, {
+      contentType: req.file.mimetype,
+      upsert: true
+    });
+
+  if (uploadError) {
+    console.error('Supabase storage upload error:', uploadError);
+    const error = new Error('Failed to upload receipt: ' + uploadError.message);
+    error.statusCode = 500;
+    throw error;
+  }
+
+  // Get the public URL
+  const { data: urlData } = supabaseAdmin
+    .storage
+    .from('Deposit Proof')
+    .getPublicUrl(filename);
+
+  const slipUrl = urlData?.publicUrl || null;
+
   const payment = await prisma.payments.create({
     data: {
       Subject: subjectName,
       Student_ID: student.Student_ID,
       Amount: String(parseFloat(amount)),
       Method: method,
-      Status: 'Pending'
+      Status: 'Pending',
+      Slip_Url: slipUrl
     }
   });
 
@@ -140,9 +218,10 @@ const createPayment = async (req, res) => {
       Student_ID: payment.Student_ID.toString(),
       Amount: payment.Amount.toString(),
       Method: payment.Method,
-      Status: payment.Status
+      Status: payment.Status,
+      Slip_Url: payment.Slip_Url ? await getSignedUrlIfNeeded(payment.Slip_Url) : null
     }
   });
 };
 
-module.exports = { getPayments, approvePayment, createPayment };
+module.exports = { getPayments, approvePayment, createPayment, rejectPayment };
