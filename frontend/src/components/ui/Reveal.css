@@ -1,0 +1,4 @@
+.reveal-wrapper {
+  /* Ensure it doesn't break layout if it's a flex/grid child */
+  display: block;
+}

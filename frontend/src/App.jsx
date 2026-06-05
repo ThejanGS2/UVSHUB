@@ -5,10 +5,12 @@ import Register     from './pages/Register';
 import Dashboard    from './pages/Dashboard';
 import Courses      from './pages/Courses';
 import CourseDetail from './pages/CourseDetail';
+import CustomCursor from './components/ui/CustomCursor';
 
 function App() {
   return (
     <BrowserRouter>
+      <CustomCursor />
       <Routes>
         <Route path="/"            element={<Landing />}      />
         <Route path="/login"       element={<Login />}        />

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './Pricing.css';
+import SpotlightCard from './ui/SpotlightCard';
+import Reveal from './ui/Reveal';
 
 const Check = () => (
   <svg className="pcard__feat-icon pcard__feat-icon--ok" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -78,43 +80,47 @@ function Pricing() {
           {annual && <span className="pricing__save">SAVE 35%</span>}
         </div>
 
-        <div className="pricing__grid">
-          {plans.map(plan => {
-            const price = annual ? plan.annual : plan.monthly;
-            return (
-              <div key={plan.id} id={plan.id} className={`pcard${plan.featured ? ' pcard--featured' : ''}`}>
-                {plan.featured && <div className="pcard__banner">✦ OPTIMAL ROUTE</div>}
-                <div className="pcard__body">
-                  <div className="pcard__tier">{plan.tier}</div>
-                  <div className="pcard__price">
-                    {price > 0 && <span className="pcard__currency">$</span>}
-                    <span className="pcard__amount">{price === 0 ? 'Free' : price}</span>
-                    {price > 0 && <span className="pcard__period">/ MO</span>}
+        <Reveal direction="up" delay={200}>
+          <div className="pricing__grid">
+            {plans.map(plan => {
+              const price = annual ? plan.annual : plan.monthly;
+              return (
+                <SpotlightCard key={plan.id} className={`pcard${plan.featured ? ' pcard--featured' : ''}`}>
+                  <div id={plan.id} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    {plan.featured && <div className="pcard__banner">✦ OPTIMAL ROUTE</div>}
+                    <div className="pcard__body" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <div className="pcard__tier">{plan.tier}</div>
+                      <div className="pcard__price">
+                        {price > 0 && <span className="pcard__currency">$</span>}
+                        <span className="pcard__amount">{price === 0 ? 'Free' : price}</span>
+                        {price > 0 && <span className="pcard__period">/ MO</span>}
+                      </div>
+                      <div className="pcard__orig">
+                        {annual && plan.monthly > 0 ? `$${plan.monthly}/mo billed monthly` : ' '}
+                      </div>
+                      <p className="pcard__desc">{plan.desc}</p>
+                      <ul className="pcard__features" style={{ flex: 1 }}>
+                        {plan.features.map((f, i) => (
+                          <li key={i} className={`pcard__feat${f.dim ? ' pcard__feat--dimmed' : ''}`}>
+                            {f.ok ? <Check /> : <Cross />}
+                            {f.label}
+                          </li>
+                        ))}
+                      </ul>
+                      <Link
+                        to="/register"
+                        id={`${plan.id}-cta`}
+                        className={`pcard__cta pcard__cta--${plan.ctaVar}`}
+                      >
+                        {plan.ctaLabel}
+                      </Link>
+                    </div>
                   </div>
-                  <div className="pcard__orig">
-                    {annual && plan.monthly > 0 ? `$${plan.monthly}/mo billed monthly` : ' '}
-                  </div>
-                  <p className="pcard__desc">{plan.desc}</p>
-                  <ul className="pcard__features">
-                    {plan.features.map((f, i) => (
-                      <li key={i} className={`pcard__feat${f.dim ? ' pcard__feat--dimmed' : ''}`}>
-                        {f.ok ? <Check /> : <Cross />}
-                        {f.label}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    to="/register"
-                    id={`${plan.id}-cta`}
-                    className={`pcard__cta pcard__cta--${plan.ctaVar}`}
-                  >
-                    {plan.ctaLabel}
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                </SpotlightCard>
+              );
+            })}
+          </div>
+        </Reveal>
 
         <p className="pricing__note">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>

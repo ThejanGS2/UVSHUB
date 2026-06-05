@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './CoursesShowcase.css';
 import CourseCard from './ui/CourseCard';
+import Reveal from './ui/Reveal';
 import { COURSES, CATEGORIES } from '../data/mockData';
 
 function CoursesShowcase() {
@@ -39,12 +40,14 @@ function CoursesShowcase() {
           ))}
         </div>
 
-        <div className="showcase__grid" role="tabpanel">
-          {filtered.length > 0
-            ? filtered.map(c => <CourseCard key={c.id} course={c} />)
-            : <p style={{ color: 'var(--ink-4)', gridColumn: '1/-1', padding: '40px', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '14px' }}>NO_RECORDS_FOUND</p>
-          }
-        </div>
+        <Reveal direction="up" delay={100}>
+          <div className="showcase__grid" role="tabpanel">
+            {filtered.length > 0
+              ? filtered.map(c => <CourseCard key={c.id} course={c} />)
+              : <p style={{ color: 'var(--ink-4)', gridColumn: '1/-1', padding: '40px', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '14px' }}>NO_RECORDS_FOUND</p>
+            }
+          </div>
+        </Reveal>
       </div>
     </section>
   );
