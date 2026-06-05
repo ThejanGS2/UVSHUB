@@ -1,13 +1,23 @@
-import './App.css';
-import Navbar from './components/Navbar';
-import Hero from './components/Hero';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Landing      from './pages/Landing';
+import Login        from './pages/Login';
+import Register     from './pages/Register';
+import Dashboard    from './pages/Dashboard';
+import Courses      from './pages/Courses';
+import CourseDetail from './pages/CourseDetail';
 
 function App() {
   return (
-    <div className="app">
-      <Navbar />
-      <Hero />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/"            element={<Landing />}      />
+        <Route path="/login"       element={<Login />}        />
+        <Route path="/register"    element={<Register />}     />
+        <Route path="/dashboard"   element={<Dashboard />}    />
+        <Route path="/courses"     element={<Courses />}      />
+        <Route path="/courses/:id" element={<CourseDetail />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
