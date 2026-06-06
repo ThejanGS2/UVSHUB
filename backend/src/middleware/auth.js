@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const supabase = require('../config/supabaseClient');
+const { prisma } = require('../config/db');
 
 const protect = async (req, res, next) => {
   let token;
@@ -17,23 +17,35 @@ const protect = async (req, res, next) => {
     return next(error);
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  req.user = await User.findById(decoded.id).select('-password');
+  // Verify the JWT via Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.getUser(token);
 
-  if (!req.user) {
-    const error = new Error('User no longer exists');
+  if (authError || !authData.user) {
+    const error = new Error('Invalid or expired token');
     error.statusCode = 401;
     return next(error);
   }
 
+  // Fetch the full student profile from Prisma
+  const student = await prisma.student.findUnique({
+    where: { id: authData.user.id },
+  });
+
+  if (!student) {
+    const error = new Error('User no longer exists in database');
+    error.statusCode = 401;
+    return next(error);
+  }
+
+  req.user = student;
   next();
 };
 
 const authorise = (...roles) =>
   (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    if (!req.user || !roles.map(r => r.toLowerCase()).includes(req.user.Role.toLowerCase())) {
       const error = new Error(
-        `Role '${req.user.role}' is not authorised to access this route`
+        `Role '${req.user?.Role}' is not authorised to access this route`
       );
       error.statusCode = 403;
       return next(error);

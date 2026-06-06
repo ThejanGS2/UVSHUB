@@ -12,6 +12,7 @@ const notFound = require('./middleware/notFound');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const courseRoutes = require('./routes/courseRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/courses', courseRoutes);
+app.use('/api/v1/payments', paymentRoutes);
 
 // ── Error handling ──────────────────────────────────────────────────────────
 app.use(notFound);

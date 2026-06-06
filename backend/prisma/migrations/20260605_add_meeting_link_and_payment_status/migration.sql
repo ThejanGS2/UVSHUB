@@ -1,0 +1,5 @@
+ALTER TABLE "Subjects"
+ADD COLUMN IF NOT EXISTS "MeetingLink" TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE "Payments"
+ADD COLUMN IF NOT EXISTS "Status" "paymentStatus" NOT NULL DEFAULT 'Pending';

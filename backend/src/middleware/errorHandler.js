@@ -1,39 +1,34 @@
 // Global error handler middleware
 // eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, next) => {
+  console.error(err.name || 'Error', err.message || err);
+
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
 
-  // Mongoose bad ObjectId
-  if (err.name === 'CastError') {
+  // Prisma Record Not Found
+  if (err.code === 'P2025') {
+    statusCode = 404;
+    message = 'Resource not found';
+  }
+
+  // Prisma Unique Constraint Violation
+  if (err.code === 'P2002') {
     statusCode = 400;
-    message = `Resource not found`;
+    const target = err.meta?.target || 'field';
+    message = `Duplicate value for unique field: ${target}`;
   }
 
-  // Mongoose duplicate key
-  if (err.code === 11000) {
+  // Prisma Validation Error
+  if (err.name === 'PrismaClientValidationError') {
     statusCode = 400;
-    const field = Object.keys(err.keyValue)[0];
-    message = `Duplicate value for field: ${field}`;
+    message = 'Invalid data provided';
   }
 
-  // Mongoose validation errors
-  if (err.name === 'ValidationError') {
-    statusCode = 400;
-    message = Object.values(err.errors)
-      .map((val) => val.message)
-      .join(', ');
-  }
-
-  // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    statusCode = 401;
-    message = 'Invalid token';
-  }
-
-  if (err.name === 'TokenExpiredError') {
-    statusCode = 401;
-    message = 'Token expired';
+  // Supabase Auth / JWT errors
+  if (err.name === 'AuthApiError' || err.__isAuthError) {
+    statusCode = err.status || 401;
+    message = err.message || 'Authentication error';
   }
 
   res.status(statusCode).json({

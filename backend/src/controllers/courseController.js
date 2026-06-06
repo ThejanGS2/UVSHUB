@@ -1,23 +1,52 @@
-const Course = require('../models/Course');
+const { prisma } = require('../config/db');
+
+// Helper to check if a string is a valid UUID
+const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 /**
- * @desc    Get all published courses
+ * @desc    Get all published courses (now mapping to Subjects)
  * @route   GET /api/v1/courses
  * @access  Public
  */
 const getCourses = async (req, res) => {
   const { category, level, search } = req.query;
-  const filter = { isPublished: true };
+  const filter = {};
 
-  if (category) filter.category = category;
-  if (level) filter.level = level;
-  if (search) filter.title = { $regex: search, $options: 'i' };
+  // Map Mongoose filters to Prisma Subject schema
+  if (category) filter.Medium = category;
+  if (level) filter.Grade = parseFloat(level);
+  if (search) filter.Name = { contains: search, mode: 'insensitive' };
 
-  const courses = await Course.find(filter)
-    .populate('instructor', 'name avatar')
-    .select('-lessons');
+  const courses = await prisma.subjects.findMany({
+    where: filter,
+    orderBy: { id: 'desc' }
+  });
 
-  res.status(200).json({ success: true, count: courses.length, data: courses });
+  // Manually populate instructors since we don't have direct Prisma relations setup
+  // Filter out any instructor values that are not valid UUIDs to prevent PostgreSQL query errors
+  const instructorIds = courses.map(c => c.Instructor).filter(Boolean).filter(isUUID);
+  let instructors = [];
+  if (instructorIds.length > 0) {
+    instructors = await prisma.student.findMany({
+      where: { id: { in: instructorIds } },
+      select: { id: true, Name: true }
+    });
+  }
+
+  const serializedCourses = courses.map(course => {
+    const instructorInfo = instructors.find(i => i.id === course.Instructor);
+    const instructorName = instructorInfo?.Name || course.Instructor || 'Unknown';
+    return {
+      ...course,
+      id: course.id.toString(),
+      Grade: parseFloat(course.Grade),
+      Price: parseFloat(course.Price),
+      InstructorName: instructorName,
+      instructor: instructorInfo || { id: course.Instructor, name: instructorName }
+    };
+  });
+
+  res.status(200).json({ success: true, count: serializedCourses.length, data: serializedCourses });
 };
 
 /**
@@ -26,10 +55,18 @@ const getCourses = async (req, res) => {
  * @access  Public
  */
 const getCourse = async (req, res) => {
-  const course = await Course.findById(req.params.id).populate(
-    'instructor',
-    'name avatar bio'
-  );
+  let courseId;
+  try {
+    courseId = BigInt(req.params.id);
+  } catch (err) {
+    const error = new Error('Invalid Course ID format');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const course = await prisma.subjects.findUnique({
+    where: { id: courseId }
+  });
 
   if (!course) {
     const error = new Error('Course not found');
@@ -37,7 +74,25 @@ const getCourse = async (req, res) => {
     throw error;
   }
 
-  res.status(200).json({ success: true, data: course });
+  // Manually populate instructor (only if it is a valid UUID)
+  let instructor = null;
+  if (course.Instructor && isUUID(course.Instructor)) {
+    instructor = await prisma.student.findUnique({
+      where: { id: course.Instructor },
+      select: { id: true, Name: true }
+    });
+  }
+
+  const serializedCourse = {
+    ...course,
+    id: course.id.toString(),
+    Grade: parseFloat(course.Grade),
+    Price: parseFloat(course.Price),
+    InstructorName: instructor?.Name || course.Instructor || 'Unknown',
+    instructor: instructor || { id: course.Instructor, name: course.Instructor || 'Unknown' }
+  };
+
+  res.status(200).json({ success: true, data: serializedCourse });
 };
 
 /**
@@ -46,9 +101,46 @@ const getCourse = async (req, res) => {
  * @access  Private (instructor, admin)
  */
 const createCourse = async (req, res) => {
-  req.body.instructor = req.user.id;
-  const course = await Course.create(req.body);
-  res.status(201).json({ success: true, data: course });
+  // Support both old API payloads and new mapped schema
+  const { title, name, level, grade, category, medium, price, meetingLink, instructor } = req.body;
+
+  if (!name && !title) {
+    const error = new Error('Course name is required');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!medium && !category) {
+    const error = new Error('Medium is required');
+    error.statusCode = 400;
+    throw error;
+  }
+  
+  const isAdmin = req.user?.Role?.toLowerCase() === 'admin';
+  const requestedInstructor = typeof instructor === 'string' ? instructor.trim() : '';
+  const instructorValue = isAdmin
+    ? (requestedInstructor || req.user?.Name || String(req.user?.id || ''))
+    : (req.user?.Name || String(req.user?.id || ''));
+
+  const course = await prisma.subjects.create({
+    data: {
+      Name: name || title, 
+      Grade: String(parseFloat(grade || level || 0)),
+      Medium: medium || category || 'Unknown',
+      Price: String(parseFloat(price || 0)),
+      MeetingLink: meetingLink || '',
+      Instructor: instructorValue
+    }
+  });
+
+  const serializedCourse = {
+    ...course,
+    id: course.id.toString(),
+    Grade: parseFloat(course.Grade),
+    Price: parseFloat(course.Price),
+  };
+
+  res.status(201).json({ success: true, data: serializedCourse });
 };
 
 /**
@@ -57,7 +149,18 @@ const createCourse = async (req, res) => {
  * @access  Private (instructor, admin)
  */
 const updateCourse = async (req, res) => {
-  let course = await Course.findById(req.params.id);
+  let courseId;
+  try {
+    courseId = BigInt(req.params.id);
+  } catch (err) {
+    const error = new Error('Invalid Course ID format');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let course = await prisma.subjects.findUnique({
+    where: { id: courseId }
+  });
 
   if (!course) {
     const error = new Error('Course not found');
@@ -66,21 +169,36 @@ const updateCourse = async (req, res) => {
   }
 
   // Ensure only the owning instructor or admin can update
-  if (
-    course.instructor.toString() !== req.user.id &&
-    req.user.role !== 'admin'
-  ) {
+  const isAdmin = req.user?.Role?.toLowerCase() === 'admin';
+  const isOwner = course.Instructor === req.user.id || course.Instructor === req.user.Name;
+  if (!isOwner && !isAdmin) {
     const error = new Error('Not authorised to update this course');
     error.statusCode = 403;
     throw error;
   }
 
-  course = await Course.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
+  const { title, name, level, grade, category, medium, price, meetingLink, instructor } = req.body;
+  const updateData = {};
+  if (name || title) updateData.Name = name || title;
+  if (grade || level) updateData.Grade = String(parseFloat(grade || level));
+  if (medium || category) updateData.Medium = medium || category;
+  if (price) updateData.Price = String(parseFloat(price));
+  if (meetingLink !== undefined) updateData.MeetingLink = meetingLink;
+  if (isAdmin && instructor !== undefined) updateData.Instructor = String(instructor).trim();
+
+  course = await prisma.subjects.update({
+    where: { id: courseId },
+    data: updateData
   });
 
-  res.status(200).json({ success: true, data: course });
+  const serializedCourse = {
+    ...course,
+    id: course.id.toString(),
+    Grade: parseFloat(course.Grade),
+    Price: parseFloat(course.Price),
+  };
+
+  res.status(200).json({ success: true, data: serializedCourse });
 };
 
 /**
@@ -89,7 +207,18 @@ const updateCourse = async (req, res) => {
  * @access  Private (instructor, admin)
  */
 const deleteCourse = async (req, res) => {
-  const course = await Course.findById(req.params.id);
+  let courseId;
+  try {
+    courseId = BigInt(req.params.id);
+  } catch (err) {
+    const error = new Error('Invalid Course ID format');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const course = await prisma.subjects.findUnique({
+    where: { id: courseId }
+  });
 
   if (!course) {
     const error = new Error('Course not found');
@@ -97,17 +226,93 @@ const deleteCourse = async (req, res) => {
     throw error;
   }
 
-  if (
-    course.instructor.toString() !== req.user.id &&
-    req.user.role !== 'admin'
-  ) {
+  const isAdmin = req.user?.Role?.toLowerCase() === 'admin';
+  const isOwner = course.Instructor === req.user.id || course.Instructor === req.user.Name;
+  if (!isOwner && !isAdmin) {
     const error = new Error('Not authorised to delete this course');
     error.statusCode = 403;
     throw error;
   }
 
-  await course.deleteOne();
+  await prisma.subjects.delete({
+    where: { id: courseId }
+  });
+
   res.status(200).json({ success: true, data: {} });
 };
 
-module.exports = { getCourses, getCourse, createCourse, updateCourse, deleteCourse };
+/**
+ * @desc    Enroll in a course
+ * @route   POST /api/v1/courses/:id/enroll
+ * @access  Private
+ */
+const enrollInCourse = async (req, res) => {
+  let courseId;
+  try {
+    courseId = BigInt(req.params.id);
+  } catch (err) {
+    const error = new Error('Invalid Course ID format');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const course = await prisma.subjects.findUnique({
+    where: { id: courseId }
+  });
+
+  if (!course) {
+    const error = new Error('Course not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const student = req.user;
+  if (!student) {
+    const error = new Error('Not authorised');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // Check if enrollment already exists
+  const existingEnrollment = await prisma.enrollments.findFirst({
+    where: {
+      Student_ID: student.Student_ID,
+      Subject_Name: course.Name
+    }
+  });
+
+  if (existingEnrollment) {
+    return res.status(200).json({
+      success: true,
+      message: 'Already enrolled in this course',
+      data: {
+        id: existingEnrollment.id.toString(),
+        Student_ID: existingEnrollment.Student_ID.toString(),
+        Studnet_Name: existingEnrollment.Studnet_Name,
+        Subject_Name: existingEnrollment.Subject_Name
+      }
+    });
+  }
+
+  // Create enrollment
+  const enrollment = await prisma.enrollments.create({
+    data: {
+      Student_ID: student.Student_ID,
+      Studnet_Name: student.Name,
+      Subject_Name: course.Name
+    }
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Enrolled successfully',
+    data: {
+      id: enrollment.id.toString(),
+      Student_ID: enrollment.Student_ID.toString(),
+      Studnet_Name: enrollment.Studnet_Name,
+      Subject_Name: enrollment.Subject_Name
+    }
+  });
+};
+
+module.exports = { getCourses, getCourse, createCourse, updateCourse, deleteCourse, enrollInCourse };
